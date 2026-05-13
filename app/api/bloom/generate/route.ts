@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       variantCount
     )
 
-    return NextResponse.json({ ids }, { status: 200 })
+    return NextResponse.json({ ids }, { status: 202 })
   } catch (err) {
     return NextResponse.json(
       {

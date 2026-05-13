@@ -20,7 +20,7 @@ export async function GET() {
   }
 
   try {
-    const brands = await listBrands(apiKey)
+    const { brands } = await listBrands(apiKey, { limit: 50 })
     const payload = brands.map((b) => ({
       id: b.id,
       name: b.name,

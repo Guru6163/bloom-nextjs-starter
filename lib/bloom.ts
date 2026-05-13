@@ -79,34 +79,65 @@ async function bloomFetch<T>(
     );
   }
 
-  return ((await response.json()) as { data: T }).data;
+  const json: unknown = await response.json();
+  if (
+    typeof json !== "object" ||
+    json === null ||
+    !("data" in json) ||
+    (json as { data: unknown }).data === undefined
+  ) {
+    throw new Error("Bloom API error: response missing data envelope");
+  }
+  return (json as { data: T }).data;
 }
 
 /**
- * Fetches the list of brands for the account.
- * Returns up to 50 brands ordered by creation date.
- * Used by getFirstReadyBrand to find a usable brand session.
+ * Page of brands from GET /brands (cursor pagination per Bloom OpenAPI).
  */
-export async function listBrands(apiKey: string): Promise<Brand[]> {
-  const data = await bloomFetch<{ brands: Brand[] }>(
-    apiKey,
-    "/brands?limit=50"
-  );
-  return data.brands;
+export interface ListBrandsResult {
+  brands: Brand[];
+  nextCursor?: string;
+  hasMore?: boolean;
 }
 
 /**
- * Fetches a single brand session by ID.
+ * Fetches a page of brand sessions (default limit 50, max 100 per API).
+ */
+export async function listBrands(
+  apiKey: string,
+  options?: { limit?: number; cursor?: string; workspaceId?: string }
+): Promise<ListBrandsResult> {
+  const limit = Math.min(100, Math.max(1, options?.limit ?? 50));
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (options?.cursor) {
+    params.set("cursor", options.cursor);
+  }
+  if (options?.workspaceId) {
+    params.set("workspaceId", options.workspaceId);
+  }
+  const data = await bloomFetch<ListBrandsResult>(
+    apiKey,
+    `/brands?${params.toString()}`
+  );
+  if (!Array.isArray(data.brands)) {
+    throw new Error("Bloom API error: brands list missing or invalid");
+  }
+  return data;
+}
+
+/**
+ * Fetches a single brand session by ID (GET /brands/{id}).
+ * Response `data` is the brand object per Bloom OpenAPI.
  */
 export async function getBrandById(
   apiKey: string,
   brandId: string
 ): Promise<Brand> {
-  const data = await bloomFetch<{ brand: Brand }>(
+  return bloomFetch<Brand>(
     apiKey,
     `/brands/${encodeURIComponent(brandId)}`
   );
-  return data.brand;
 }
 
 /**
@@ -115,7 +146,7 @@ export async function getBrandById(
 export async function getFirstReadyBrand(
   apiKey: string
 ): Promise<Brand | null> {
-  const brands = await listBrands(apiKey);
+  const { brands } = await listBrands(apiKey, { limit: 50 });
   const ready = brands.find((b) => b.status === "ready");
   return ready ?? null;
 }
@@ -124,6 +155,7 @@ export async function getFirstReadyBrand(
  * Starts an image generation job and returns the image IDs immediately.
  * Generation is asynchronous — call pollImages() to wait for completion.
  * Each variant costs one credit (2K) or two credits (4K).
+ * Returns 202 from Bloom; `response.ok` is still true.
  */
 export async function generateImages(
   apiKey: string,
@@ -132,22 +164,25 @@ export async function generateImages(
   aspectRatio: AspectRatio = "16:9",
   variantCount: number = 1
 ): Promise<string[]> {
-  const data = await bloomFetch<{ ids: string[] }>(
-    apiKey,
-    "/images/generations",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        brandSessionId,
-        prompt,
-        aspectRatio,
-        imageSize: "2K",
-        model: "fast",
-        variantCount,
-        referenceImageIds: [],
-      }),
-    }
-  );
+  const data = await bloomFetch<{
+    ids: string[];
+    variantGroupId?: string;
+    status?: string;
+  }>(apiKey, "/images/generations", {
+    method: "POST",
+    body: JSON.stringify({
+      brandSessionId,
+      prompt,
+      aspectRatio,
+      imageSize: "2K",
+      model: "fast",
+      variantCount,
+      referenceImageIds: [],
+    }),
+  });
+  if (!Array.isArray(data.ids) || data.ids.length === 0) {
+    throw new Error("Bloom API error: generation response missing ids");
+  }
   return data.ids;
 }
 
@@ -169,6 +204,10 @@ export async function pollImages(
     apiKey,
     `/images?ids=${idsParam}&wait=true&timeout=120&includeUrls=true`
   );
+
+  if (!Array.isArray(data.images)) {
+    throw new Error("Bloom API error: images response missing images array");
+  }
 
   for (const image of data.images) {
     if (image.status === "failed") {
