@@ -1,3 +1,77 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/*
+ * Design tokens scraped from trybloom.ai production CSS
+ * (https://www.trybloom.ai — light marketing theme, Feb 2026).
+ * Semantic names match their shadcn-style theme variables.
+ */
+:root {
+  --background: #fff;
+  --foreground: #0a0a0a;
+  --card: #f8f8f8;
+  --card-foreground: #0a0a0a;
+  --popover: #fcfcfc;
+  --popover-foreground: #0a0a0a;
+  --primary: #7a2cbf;
+  --primary-foreground: #fff;
+  --primary-dark: #602295;
+  --primary-light: #9449d5;
+  --primary-highlight: #f0e5fa;
+  --muted: #f4f4f4;
+  --muted-foreground: gray;
+  --accent: #eee;
+  --accent-foreground: #171717;
+  --destructive: #e40014;
+  --destructive-foreground: #fff;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #bb8ce7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), ui-serif, Georgia,
+    "Times New Roman", serif;
+}
+
+/* trybloom landing page noise overlay */
+.landing-grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  opacity: 0.12;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/* trybloom primary CTA inset highlight (from .primary-button-shadow) */
+.primary-button-shadow {
+  box-shadow:
+    inset 0 -2px 2px var(--primary-dark),
+    inset 0 2px 2px var(--primary-light),
+    0 0 0 1px var(--primary);
+}
+
+html .font-serif {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
