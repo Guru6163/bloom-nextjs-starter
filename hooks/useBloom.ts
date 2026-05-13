@@ -11,7 +11,7 @@
  *
  * Usage:
  *   const { generate, images, loading, error, reset } = useBloom()
- *   await generate("summer sale hero", "16:9", 2)
+ *   await generate("summer sale hero", "16:9", 2, brandSessionId)
  */
 
 import { useState, useCallback } from "react"
@@ -37,7 +37,9 @@ export interface UseBloomReturn {
   generate: (
     prompt: string,
     aspectRatio?: AspectRatio,
-    variantCount?: number
+    variantCount?: number,
+    /** Bloom brand session ID (must be status "ready"). If omitted, the API uses the first ready brand. */
+    brandSessionId?: string
   ) => Promise<void>
   /** Clears images and error state to allow a fresh generation. */
   reset: () => void
@@ -115,7 +117,8 @@ export function useBloom(): UseBloomReturn {
     async (
       prompt: string,
       aspectRatio: AspectRatio = "16:9",
-      variantCount: number = 1
+      variantCount: number = 1,
+      brandSessionId?: string
     ): Promise<void> => {
       setLoading(true)
       setError(null)
@@ -125,7 +128,14 @@ export function useBloom(): UseBloomReturn {
         const genRes = await fetch("/api/bloom/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, aspectRatio, variantCount }),
+          body: JSON.stringify({
+            prompt,
+            aspectRatio,
+            variantCount,
+            ...(brandSessionId
+              ? { brandSessionId }
+              : {}),
+          }),
         })
         const genBody: unknown = await genRes.json()
 

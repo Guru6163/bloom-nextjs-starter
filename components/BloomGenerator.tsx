@@ -32,6 +32,68 @@ function clampVariantCount(n: number): number {
   return Math.min(5, Math.max(1, n))
 }
 
+type BrandOption = {
+  id: string
+  name: string
+  url: string
+  status: "analyzing" | "ready" | "logo_required" | "failed"
+}
+
+function readJsonError(payload: unknown): string | undefined {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("error" in payload)
+  ) {
+    return undefined
+  }
+  const value = (payload as { error: unknown }).error
+  return typeof value === "string" ? value : undefined
+}
+
+function readBrandsPayload(
+  payload: unknown
+): { brands: BrandOption[] } | null {
+  if (typeof payload !== "object" || payload === null || !("brands" in payload)) {
+    return null
+  }
+  const raw = (payload as { brands: unknown }).brands
+  if (!Array.isArray(raw)) {
+    return null
+  }
+  const brands: BrandOption[] = []
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) {
+      return null
+    }
+    if (!("id" in item) || !("name" in item) || !("url" in item) || !("status" in item)) {
+      return null
+    }
+    const id = (item as { id: unknown }).id
+    const name = (item as { name: unknown }).name
+    const url = (item as { url: unknown }).url
+    const status = (item as { status: unknown }).status
+    if (
+      typeof id !== "string" ||
+      typeof name !== "string" ||
+      typeof url !== "string" ||
+      typeof status !== "string"
+    ) {
+      return null
+    }
+    if (
+      status !== "analyzing" &&
+      status !== "ready" &&
+      status !== "logo_required" &&
+      status !== "failed"
+    ) {
+      return null
+    }
+    brands.push({ id, name, url, status })
+  }
+  return { brands }
+}
+
 export default function BloomGenerator({
   defaultPrompt = "",
   defaultAspectRatio = "16:9",
@@ -45,8 +107,51 @@ export default function BloomGenerator({
     clampVariantCount(defaultVariantCount)
   )
 
+  const [brands, setBrands] = useState<BrandOption[]>([])
+  const [brandsLoading, setBrandsLoading] = useState(true)
+  const [brandsError, setBrandsError] = useState<string | null>(null)
+  const [selectedBrandId, setSelectedBrandId] = useState("")
+
   const { generate, images, loading, error, reset } = useBloom()
   const wasLoadingRef = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setBrandsLoading(true)
+      setBrandsError(null)
+      try {
+        const res = await fetch("/api/bloom/brands")
+        const payload: unknown = await res.json()
+        if (!res.ok) {
+          throw new Error(readJsonError(payload) ?? "Failed to load brands")
+        }
+        const parsed = readBrandsPayload(payload)
+        if (!parsed) {
+          throw new Error("Invalid brands response")
+        }
+        if (cancelled) {
+          return
+        }
+        setBrands(parsed.brands)
+        const firstReady = parsed.brands.find((b) => b.status === "ready")
+        setSelectedBrandId(firstReady?.id ?? "")
+      } catch (err) {
+        if (!cancelled) {
+          setBrandsError(
+            err instanceof Error ? err.message : "Failed to load brands"
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setBrandsLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const wasLoading = wasLoadingRef.current
@@ -65,10 +170,10 @@ export default function BloomGenerator({
 
   async function handleGenerate() {
     const trimmed = prompt.trim()
-    if (!trimmed) {
+    if (!trimmed || !selectedBrandId) {
       return
     }
-    await generate(trimmed, aspectRatio, variantCount)
+    await generate(trimmed, aspectRatio, variantCount, selectedBrandId)
   }
 
   function handleReset() {
@@ -108,6 +213,50 @@ export default function BloomGenerator({
         </div>
 
         <div className="space-y-6 px-6 py-6 sm:px-8 sm:py-8">
+          <div className="space-y-2">
+            <label
+              htmlFor="bloom-brand"
+              className="text-sm font-medium text-foreground"
+            >
+              Brand
+            </label>
+            <select
+              id="bloom-brand"
+              value={selectedBrandId}
+              onChange={(e) => setSelectedBrandId(e.target.value)}
+              disabled={loading || brandsLoading || brands.length === 0}
+              className={`${fieldClass} h-9`}
+            >
+              {brandsLoading ? (
+                <option value="">Loading brands…</option>
+              ) : brands.length === 0 ? (
+                <option value="">No brands found</option>
+              ) : (
+                brands.map((b) => (
+                  <option
+                    key={b.id}
+                    value={b.id}
+                    disabled={b.status !== "ready"}
+                  >
+                    {b.name} — {b.status}
+                  </option>
+                ))
+              )}
+            </select>
+            {brandsError && (
+              <p className="text-xs text-destructive">{brandsError}</p>
+            )}
+            {!brandsLoading &&
+              !brandsError &&
+              brands.length > 0 &&
+              !brands.some((b) => b.status === "ready") && (
+                <p className="text-xs text-muted-foreground">
+                  No brand is ready yet. Finish onboarding in Bloom, then refresh
+                  this page.
+                </p>
+              )}
+          </div>
+
           <div className="space-y-2">
             <label
               htmlFor="bloom-prompt"
@@ -181,7 +330,12 @@ export default function BloomGenerator({
               <button
                 type="button"
                 onClick={() => void handleGenerate()}
-                disabled={loading || !prompt.trim()}
+                disabled={
+                  loading ||
+                  !prompt.trim() ||
+                  !selectedBrandId ||
+                  brandsLoading
+                }
                 className={primaryBtn}
               >
                 {loading ? (

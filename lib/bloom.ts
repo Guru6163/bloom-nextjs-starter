@@ -96,22 +96,25 @@ export async function listBrands(apiKey: string): Promise<Brand[]> {
 }
 
 /**
+ * Fetches a single brand session by ID.
+ */
+export async function getBrandById(
+  apiKey: string,
+  brandId: string
+): Promise<Brand> {
+  const data = await bloomFetch<{ brand: Brand }>(
+    apiKey,
+    `/brands/${encodeURIComponent(brandId)}`
+  );
+  return data.brand;
+}
+
+/**
  * Returns the first brand with status "ready", or null if none exist.
- * Falls back to BLOOM_BRAND_SESSION_ID env var if set, which lets
- * developers pin a specific brand without listing all brands on every request.
  */
 export async function getFirstReadyBrand(
   apiKey: string
 ): Promise<Brand | null> {
-  const pinnedId = process.env.BLOOM_BRAND_SESSION_ID;
-  if (pinnedId) {
-    const data = await bloomFetch<{ brand: Brand }>(
-      apiKey,
-      `/brands/${encodeURIComponent(pinnedId)}`
-    );
-    return data.brand.status === "ready" ? data.brand : null;
-  }
-
   const brands = await listBrands(apiKey);
   const ready = brands.find((b) => b.status === "ready");
   return ready ?? null;

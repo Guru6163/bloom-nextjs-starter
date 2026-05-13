@@ -10,6 +10,7 @@
 | File | What it does |
 | --- | --- |
 | `lib/bloom.ts` | Server-side Bloom API client |
+| `app/api/bloom/brands/route.ts` | GET endpoint — list brands for the picker |
 | `app/api/bloom/generate/route.ts` | POST endpoint — starts generation |
 | `app/api/bloom/poll/route.ts` | GET endpoint — waits for results |
 | `hooks/useBloom.ts` | React hook: generate, loading, error, reset |
@@ -46,7 +47,7 @@ BLOOM_API_KEY=bloom_sk_your_key_here
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — type a prompt and generate.
+Open [http://localhost:3000](http://localhost:3000) — pick a ready brand, type a prompt, and generate.
 
 ---
 
@@ -55,7 +56,11 @@ Open [http://localhost:3000](http://localhost:3000) — type a prompt and genera
 ```text
 Browser
   │
-  ├─ POST /api/bloom/generate
+  ├─ GET /api/bloom/brands
+  │    ↓ lib/bloom.ts → GET /brands?limit=50
+  │    ← { brands: [{ id, name, status, url }] }
+  │
+  ├─ POST /api/bloom/generate  (body includes brandSessionId when using the UI)
   │    ↓ lib/bloom.ts → POST /images/generations
   │    ← { ids: ["uuid1", "uuid2"] }
   │
@@ -95,10 +100,14 @@ export default function MyPage() {
 import { useBloom } from "@/hooks/useBloom"
 
 export default function MyComponent() {
+  const brandId = "your-ready-brand-session-id" // e.g. from GET /api/bloom/brands
+
   const { generate, images, loading, error } = useBloom()
 
   return (
-    <button onClick={() => generate("summer sale banner", "16:9", 2)}>
+    <button
+      onClick={() => generate("summer sale banner", "16:9", 2, brandId)}
+    >
       {loading ? "Generating..." : "Generate"}
     </button>
   )
@@ -112,7 +121,6 @@ export default function MyComponent() {
 | Variable | Required | Description |
 | --- | --- | --- |
 | `BLOOM_API_KEY` | ✅ | Your Bloom API key |
-| `BLOOM_BRAND_SESSION_ID` | optional | Pin a specific brand. Auto-detected if not set. |
 
 ---
 
