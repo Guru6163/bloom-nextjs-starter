@@ -15,15 +15,15 @@
  */
 
 import { useState, useCallback } from "react"
-import type { AspectRatio } from "@/lib/bloom"
+import {
+  parseApiError,
+  parseGenerateResponse,
+  parsePollResponse,
+  type AspectRatio,
+  type GenerateRequestBody,
+} from "@/lib/bloom-api"
 
 export type { AspectRatio }
-
-interface UseBloomState {
-  images: string[]
-  loading: boolean
-  error: string | null
-}
 
 export interface UseBloomReturn {
   images: string[]
@@ -45,73 +45,10 @@ export interface UseBloomReturn {
   reset: () => void
 }
 
-function readJsonError(payload: unknown): string | undefined {
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("error" in payload)
-  ) {
-    return undefined
-  }
-  const value = (payload as { error: unknown }).error
-  return typeof value === "string" ? value : undefined
-}
-
-function readGenerateIds(payload: unknown): string[] | null {
-  if (typeof payload !== "object" || payload === null || !("ids" in payload)) {
-    return null
-  }
-  const ids = (payload as { ids: unknown }).ids
-  if (!Array.isArray(ids)) {
-    return null
-  }
-  if (!ids.every((id): id is string => typeof id === "string")) {
-    return null
-  }
-  return ids
-}
-
-function readPollImages(
-  payload: unknown
-): Array<{ id: string; url: string; status: string }> | null {
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("images" in payload)
-  ) {
-    return null
-  }
-  const images = (payload as { images: unknown }).images
-  if (!Array.isArray(images)) {
-    return null
-  }
-  const out: Array<{ id: string; url: string; status: string }> = []
-  for (const item of images) {
-    if (typeof item !== "object" || item === null) {
-      return null
-    }
-    if (!("id" in item) || !("url" in item) || !("status" in item)) {
-      return null
-    }
-    const id = (item as { id: unknown }).id
-    const url = (item as { url: unknown }).url
-    const status = (item as { status: unknown }).status
-    if (
-      typeof id !== "string" ||
-      typeof url !== "string" ||
-      typeof status !== "string"
-    ) {
-      return null
-    }
-    out.push({ id, url, status })
-  }
-  return out
-}
-
 export function useBloom(): UseBloomReturn {
-  const [images, setImages] = useState<UseBloomState["images"]>([])
-  const [loading, setLoading] = useState<UseBloomState["loading"]>(false)
-  const [error, setError] = useState<UseBloomState["error"]>(null)
+  const [images, setImages] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const generate = useCallback(
     async (
@@ -125,46 +62,44 @@ export function useBloom(): UseBloomReturn {
       setImages([])
 
       try {
+        const requestBody: GenerateRequestBody = {
+          prompt,
+          aspectRatio,
+          variantCount,
+          ...(brandSessionId ? { brandSessionId } : {}),
+        }
+
         const genRes = await fetch("/api/bloom/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt,
-            aspectRatio,
-            variantCount,
-            ...(brandSessionId
-              ? { brandSessionId }
-              : {}),
-          }),
+          body: JSON.stringify(requestBody),
         })
         const genBody: unknown = await genRes.json()
 
         if (!genRes.ok) {
-          throw new Error(
-            readJsonError(genBody) ?? "Generation failed"
-          )
+          throw new Error(parseApiError(genBody) ?? "Generation failed")
         }
 
-        const ids = readGenerateIds(genBody)
-        if (!ids) {
+        const generateResponse = parseGenerateResponse(genBody)
+        if (!generateResponse) {
           throw new Error("Generation failed")
         }
 
         const pollRes = await fetch(
-          `/api/bloom/poll?ids=${ids.join(",")}`
+          `/api/bloom/poll?ids=${generateResponse.ids.join(",")}`
         )
         const pollBody: unknown = await pollRes.json()
 
         if (!pollRes.ok) {
-          throw new Error(readJsonError(pollBody) ?? "Poll failed")
+          throw new Error(parseApiError(pollBody) ?? "Poll failed")
         }
 
-        const polled = readPollImages(pollBody)
-        if (!polled) {
+        const pollResponse = parsePollResponse(pollBody)
+        if (!pollResponse) {
           throw new Error("Poll failed")
         }
 
-        setImages(polled.map((img) => img.url))
+        setImages(pollResponse.images.map((img) => img.url))
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Something went wrong"

@@ -9,11 +9,16 @@
 
 import { NextResponse } from "next/server"
 import { listBrands } from "@/lib/bloom"
+import {
+  toBrandSummary,
+  type ApiErrorResponse,
+  type BrandsResponse,
+} from "@/lib/bloom-api"
 
 export async function GET() {
   const apiKey = process.env.BLOOM_API_KEY
   if (!apiKey) {
-    return NextResponse.json(
+    return NextResponse.json<ApiErrorResponse>(
       { error: "BLOOM_API_KEY is not configured" },
       { status: 500 }
     )
@@ -21,18 +26,14 @@ export async function GET() {
 
   try {
     const { brands } = await listBrands(apiKey, { limit: 50 })
-    const payload = brands.map((b) => ({
-      id: b.id,
-      name: b.name,
-      url: b.url,
-      status: b.status,
-    }))
-    return NextResponse.json({ brands: payload }, { status: 200 })
+    const payload: BrandsResponse = {
+      brands: brands.map(toBrandSummary),
+    }
+    return NextResponse.json<BrandsResponse>(payload, { status: 200 })
   } catch (err) {
-    return NextResponse.json(
+    return NextResponse.json<ApiErrorResponse>(
       {
-        error:
-          err instanceof Error ? err.message : "Failed to list brands",
+        error: err instanceof Error ? err.message : "Failed to list brands",
       },
       { status: 500 }
     )

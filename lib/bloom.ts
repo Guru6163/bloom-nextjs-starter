@@ -54,6 +54,21 @@ export type AspectRatio =
   | "16:9"
   | "21:9";
 
+interface BloomApiEnvelope<T> {
+  data: T;
+}
+
+function isBloomApiEnvelope<T>(
+  value: unknown
+): value is BloomApiEnvelope<T> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "data" in value &&
+    (value as BloomApiEnvelope<T>).data !== undefined
+  );
+}
+
 /**
  * Shared fetch wrapper for all Bloom API requests.
  * Centralises auth headers and error formatting.
@@ -80,15 +95,10 @@ async function bloomFetch<T>(
   }
 
   const json: unknown = await response.json();
-  if (
-    typeof json !== "object" ||
-    json === null ||
-    !("data" in json) ||
-    (json as { data: unknown }).data === undefined
-  ) {
+  if (!isBloomApiEnvelope<T>(json)) {
     throw new Error("Bloom API error: response missing data envelope");
   }
-  return (json as { data: T }).data;
+  return json.data;
 }
 
 /**

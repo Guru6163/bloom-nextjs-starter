@@ -4,6 +4,11 @@ import Image from "next/image"
 import { useState, useEffect, useRef } from "react"
 import { useBloom } from "@/hooks/useBloom"
 import type { AspectRatio } from "@/hooks/useBloom"
+import {
+  parseApiError,
+  parseBrandsResponse,
+  type BrandSummary,
+} from "@/lib/bloom-api"
 
 const ASPECT_RATIOS: { label: string; value: AspectRatio }[] = [
   { label: "Square (1:1)", value: "1:1" },
@@ -32,68 +37,6 @@ function clampVariantCount(n: number): number {
   return Math.min(5, Math.max(1, n))
 }
 
-type BrandOption = {
-  id: string
-  name: string
-  url: string
-  status: "analyzing" | "ready" | "logo_required" | "failed"
-}
-
-function readJsonError(payload: unknown): string | undefined {
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("error" in payload)
-  ) {
-    return undefined
-  }
-  const value = (payload as { error: unknown }).error
-  return typeof value === "string" ? value : undefined
-}
-
-function readBrandsPayload(
-  payload: unknown
-): { brands: BrandOption[] } | null {
-  if (typeof payload !== "object" || payload === null || !("brands" in payload)) {
-    return null
-  }
-  const raw = (payload as { brands: unknown }).brands
-  if (!Array.isArray(raw)) {
-    return null
-  }
-  const brands: BrandOption[] = []
-  for (const item of raw) {
-    if (typeof item !== "object" || item === null) {
-      return null
-    }
-    if (!("id" in item) || !("name" in item) || !("url" in item) || !("status" in item)) {
-      return null
-    }
-    const id = (item as { id: unknown }).id
-    const name = (item as { name: unknown }).name
-    const url = (item as { url: unknown }).url
-    const status = (item as { status: unknown }).status
-    if (
-      typeof id !== "string" ||
-      typeof name !== "string" ||
-      typeof url !== "string" ||
-      typeof status !== "string"
-    ) {
-      return null
-    }
-    if (
-      status !== "analyzing" &&
-      status !== "ready" &&
-      status !== "logo_required" &&
-      status !== "failed"
-    ) {
-      return null
-    }
-    brands.push({ id, name, url, status })
-  }
-  return { brands }
-}
-
 export default function BloomGenerator({
   defaultPrompt = "",
   defaultAspectRatio = "16:9",
@@ -107,7 +50,7 @@ export default function BloomGenerator({
     clampVariantCount(defaultVariantCount)
   )
 
-  const [brands, setBrands] = useState<BrandOption[]>([])
+  const [brands, setBrands] = useState<BrandSummary[]>([])
   const [brandsLoading, setBrandsLoading] = useState(true)
   const [brandsError, setBrandsError] = useState<string | null>(null)
   const [selectedBrandId, setSelectedBrandId] = useState("")
@@ -124,17 +67,17 @@ export default function BloomGenerator({
         const res = await fetch("/api/bloom/brands")
         const payload: unknown = await res.json()
         if (!res.ok) {
-          throw new Error(readJsonError(payload) ?? "Failed to load brands")
+          throw new Error(parseApiError(payload) ?? "Failed to load brands")
         }
-        const parsed = readBrandsPayload(payload)
-        if (!parsed) {
+        const brandsResponse = parseBrandsResponse(payload)
+        if (!brandsResponse) {
           throw new Error("Invalid brands response")
         }
         if (cancelled) {
           return
         }
-        setBrands(parsed.brands)
-        const firstReady = parsed.brands.find((b) => b.status === "ready")
+        setBrands(brandsResponse.brands)
+        const firstReady = brandsResponse.brands.find((b) => b.status === "ready")
         setSelectedBrandId(firstReady?.id ?? "")
       } catch (err) {
         if (!cancelled) {
