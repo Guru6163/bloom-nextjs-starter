@@ -12,7 +12,7 @@
 | `lib/bloom.ts` | Server-side Bloom API client |
 | `app/api/bloom/brands/route.ts` | GET endpoint — list brands for the picker |
 | `app/api/bloom/generate/route.ts` | POST endpoint — starts generation |
-| `app/api/bloom/poll/route.ts` | GET endpoint — waits for results |
+| `app/api/bloom/wait/route.ts` | GET endpoint — waits for results |
 | `hooks/useBloom.ts` | React hook: generate, loading, error, reset |
 | `components/BloomGenerator.tsx` | Drop-in generator component |
 | `app/page.tsx` | Demo page |
@@ -64,7 +64,7 @@ Browser
   │    ↓ lib/bloom.ts → POST /images/generations
   │    ← { ids: ["uuid1", "uuid2"] }
   │
-  └─ GET /api/bloom/poll?ids=uuid1,uuid2
+  └─ GET /api/bloom/wait?ids=uuid1,uuid2
        ↓ lib/bloom.ts → GET /images?ids=...&wait=true
        ← { images: [{ id, url, status }] }
 ```

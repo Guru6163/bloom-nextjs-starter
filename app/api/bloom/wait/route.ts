@@ -1,19 +1,19 @@
 /**
- * app/api/bloom/poll/route.ts
+ * app/api/bloom/wait/route.ts
  *
- * GET /api/bloom/poll?ids=uuid1,uuid2
+ * GET /api/bloom/wait?ids=uuid1,uuid2
  *
- * Polls Bloom for generation results using wait=true, which holds
+ * Waits for Bloom generation results using wait=true, which holds
  * the server-side connection until all images complete.
- * The client makes one fetch call and waits — no polling loop needed.
+ * The client makes one fetch call and blocks until done.
  *
  * Called by: hooks/useBloom.ts
  * Depends on: lib/bloom.ts
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { pollImages, getImageUrl } from "@/lib/bloom"
-import type { ApiErrorResponse, PollResponse } from "@/lib/bloom-api"
+import { waitForImages, getImageUrl } from "@/lib/bloom"
+import type { ApiErrorResponse, WaitImagesResponse } from "@/lib/bloom-api"
 
 export async function GET(request: NextRequest) {
   const apiKey = process.env.BLOOM_API_KEY
@@ -47,17 +47,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const polledImages = await pollImages(apiKey, ids)
-    const images: PollResponse["images"] = polledImages.map((img) => ({
+    const completedImages = await waitForImages(apiKey, ids)
+    const images: WaitImagesResponse["images"] = completedImages.map((img) => ({
       id: img.id,
       url: getImageUrl(img),
       status: "completed" as const,
     }))
-    return NextResponse.json<PollResponse>({ images }, { status: 200 })
+    return NextResponse.json<WaitImagesResponse>({ images }, { status: 200 })
   } catch (err) {
     return NextResponse.json<ApiErrorResponse>(
       {
-        error: err instanceof Error ? err.message : "Poll failed",
+        error: err instanceof Error ? err.message : "Wait for images failed",
       },
       { status: 500 }
     )

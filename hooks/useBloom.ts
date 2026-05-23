@@ -5,7 +5,7 @@
  *
  * React hook for generating on-brand images with the Bloom API.
  *
- * Handles the full generate → poll flow, keeping all async
+ * Handles the full generate → wait flow, keeping all async
  * logic out of components. The API key stays server-side —
  * this hook only talks to /api/bloom/* routes.
  *
@@ -18,7 +18,7 @@ import { useState, useCallback } from "react"
 import {
   parseApiError,
   parseGenerateResponse,
-  parsePollResponse,
+  parseWaitImagesResponse,
   type AspectRatio,
   type GenerateRequestBody,
 } from "@/lib/bloom-api"
@@ -30,7 +30,7 @@ export interface UseBloomReturn {
   loading: boolean
   error: string | null
   /**
-   * Starts generation and polls until images are ready.
+   * Starts generation and waits until images are ready.
    * Resolves when all images are complete.
    * Rejects (and sets error state) on API or network failure.
    */
@@ -85,21 +85,21 @@ export function useBloom(): UseBloomReturn {
           throw new Error("Generation failed")
         }
 
-        const pollRes = await fetch(
-          `/api/bloom/poll?ids=${generateResponse.ids.join(",")}`
+        const waitRes = await fetch(
+          `/api/bloom/wait?ids=${generateResponse.ids.join(",")}`
         )
-        const pollBody: unknown = await pollRes.json()
+        const waitBody: unknown = await waitRes.json()
 
-        if (!pollRes.ok) {
-          throw new Error(parseApiError(pollBody) ?? "Poll failed")
+        if (!waitRes.ok) {
+          throw new Error(parseApiError(waitBody) ?? "Wait for images failed")
         }
 
-        const pollResponse = parsePollResponse(pollBody)
-        if (!pollResponse) {
-          throw new Error("Poll failed")
+        const waitResponse = parseWaitImagesResponse(waitBody)
+        if (!waitResponse) {
+          throw new Error("Wait for images failed")
         }
 
-        setImages(pollResponse.images.map((img) => img.url))
+        setImages(waitResponse.images.map((img) => img.url))
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Something went wrong"

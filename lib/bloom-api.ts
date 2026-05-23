@@ -42,14 +42,14 @@ export interface GenerateResponse {
   ids: string[]
 }
 
-export interface PollImageResult {
+export interface WaitImageResult {
   id: string
   url: string
   status: "completed"
 }
 
-export interface PollResponse {
-  images: PollImageResult[]
+export interface WaitImagesResponse {
+  images: WaitImageResult[]
 }
 
 export interface BrandsResponse {
@@ -126,12 +126,14 @@ export function parseGenerateResponse(
   return { ids: payload.ids }
 }
 
-export function parsePollResponse(payload: unknown): PollResponse | null {
+export function parseWaitImagesResponse(
+  payload: unknown
+): WaitImagesResponse | null {
   if (!isRecord(payload) || !Array.isArray(payload.images)) {
     return null
   }
 
-  const images: PollImageResult[] = []
+  const images: WaitImageResult[] = []
   for (const item of payload.images) {
     if (!isRecord(item)) {
       return null

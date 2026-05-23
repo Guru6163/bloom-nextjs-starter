@@ -142,7 +142,7 @@ export async function getFirstReadyBrand(
 
 /**
  * Starts an image generation job and returns the image IDs immediately.
- * Generation is asynchronous — call pollImages() to wait for completion.
+ * Generation is asynchronous — call waitForImages() to wait for completion.
  * Each variant costs one credit (2K) or two credits (4K).
  * Returns 202 from Bloom; `response.ok` is still true.
  */
@@ -176,11 +176,11 @@ export async function generateImages(
 }
 
 /**
- * Polls the API until all image IDs reach a terminal status.
- * Uses wait=true so the server holds the connection — no polling loop needed.
+ * Waits until all image IDs reach a terminal status (completed or failed).
+ * Uses Bloom's wait=true so one request blocks until images are ready.
  * Throws if any image fails.
  */
-export async function pollImages(
+export async function waitForImages(
   apiKey: string,
   imageIds: string[]
 ): Promise<BloomImage[]> {
