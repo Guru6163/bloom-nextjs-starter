@@ -11,52 +11,41 @@
  * from env directly, so they remain testable in isolation.
  */
 
-/**
- * A brand session returned by the Bloom API.
- */
-export interface Brand {
-  id: string;
-  name: string;
-  url: string;
-  status: "analyzing" | "ready" | "logo_required" | "failed";
-  imageCount?: number;
-  workspaceId?: string;
-  workspaceName?: string;
-  createdAt: string;
-}
+import {
+  type AspectRatio,
+  type BloomApiEnvelope,
+  type BloomImage,
+  type BrandDetail,
+  type BrandListItem,
+  type GenerateImagesResult,
+  type ListBrandsResult,
+  type ListImagesResult,
+} from "@/lib/bloom-types";
 
-/**
- * An image record from the Bloom API, including generation status and URL.
- */
-export interface BloomImage {
-  id: string;
-  status: "pending" | "generating" | "completed" | "failed";
-  imageUrl?: string;
-  aspectRatio?: string;
-  prompt?: string;
-  width?: number;
-  height?: number;
-  createdAt?: string;
-}
-
-/**
- * Supported aspect ratios for image generation.
- */
-export type AspectRatio =
-  | "1:1"
-  | "2:3"
-  | "3:2"
-  | "3:4"
-  | "4:3"
-  | "4:5"
-  | "5:4"
-  | "9:16"
-  | "16:9"
-  | "21:9";
-
-interface BloomApiEnvelope<T> {
-  data: T;
-}
+export type {
+  Account,
+  AspectRatio,
+  BloomImage,
+  BrandCreateStatus,
+  BrandDetail,
+  BrandListItem,
+  BrandLogoUpdateStatus,
+  BrandStatus,
+  CreateBrandRequest,
+  CreateBrandResult,
+  CreditBalance,
+  GenerateImagesRequest,
+  GenerateImagesResult,
+  GenerationModel,
+  ImageActionType,
+  ImageSize,
+  ImageSource,
+  ImageStatus,
+  ListBrandsResult,
+  ListImagesResult,
+  ListWorkspacesResult,
+  Workspace,
+} from "@/lib/bloom-types";
 
 function isBloomApiEnvelope<T>(
   value: unknown
@@ -102,15 +91,6 @@ async function bloomFetch<T>(
 }
 
 /**
- * Page of brands from GET /brands (cursor pagination per Bloom OpenAPI).
- */
-export interface ListBrandsResult {
-  brands: Brand[];
-  nextCursor?: string;
-  hasMore?: boolean;
-}
-
-/**
  * Fetches a page of brand sessions (default limit 50, max 100 per API).
  */
 export async function listBrands(
@@ -138,13 +118,12 @@ export async function listBrands(
 
 /**
  * Fetches a single brand session by ID (GET /brands/{id}).
- * Response `data` is the brand object per Bloom OpenAPI.
  */
 export async function getBrandById(
   apiKey: string,
   brandId: string
-): Promise<Brand> {
-  return bloomFetch<Brand>(
+): Promise<BrandDetail> {
+  return bloomFetch<BrandDetail>(
     apiKey,
     `/brands/${encodeURIComponent(brandId)}`
   );
@@ -155,7 +134,7 @@ export async function getBrandById(
  */
 export async function getFirstReadyBrand(
   apiKey: string
-): Promise<Brand | null> {
+): Promise<BrandListItem | null> {
   const { brands } = await listBrands(apiKey, { limit: 50 });
   const ready = brands.find((b) => b.status === "ready");
   return ready ?? null;
@@ -174,22 +153,22 @@ export async function generateImages(
   aspectRatio: AspectRatio = "16:9",
   variantCount: number = 1
 ): Promise<string[]> {
-  const data = await bloomFetch<{
-    ids: string[];
-    variantGroupId?: string;
-    status?: string;
-  }>(apiKey, "/images/generations", {
-    method: "POST",
-    body: JSON.stringify({
-      brandSessionId,
-      prompt,
-      aspectRatio,
-      imageSize: "2K",
-      model: "fast",
-      variantCount,
-      referenceImageIds: [],
-    }),
-  });
+  const data = await bloomFetch<GenerateImagesResult>(
+    apiKey,
+    "/images/generations",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        brandSessionId,
+        prompt,
+        aspectRatio,
+        imageSize: "2K",
+        model: "fast",
+        variantCount,
+        referenceImageIds: [],
+      }),
+    }
+  );
   if (!Array.isArray(data.ids) || data.ids.length === 0) {
     throw new Error("Bloom API error: generation response missing ids");
   }
@@ -210,7 +189,7 @@ export async function pollImages(
   }
 
   const idsParam = imageIds.join(",");
-  const data = await bloomFetch<{ images: BloomImage[] }>(
+  const data = await bloomFetch<ListImagesResult>(
     apiKey,
     `/images?ids=${idsParam}&wait=true&timeout=120&includeUrls=true`
   );

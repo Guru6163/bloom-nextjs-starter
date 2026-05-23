@@ -15,7 +15,6 @@ import {
   generateImages,
   getBrandById,
   getFirstReadyBrand,
-  type Brand,
 } from "@/lib/bloom"
 import {
   parseGenerateRequestBody,
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
   const { prompt, aspectRatio, variantCount, brandSessionId } = parsed.body
 
   try {
-    let brandSession: Brand
+    let brandId: string
 
     if (brandSessionId) {
       const brand = await getBrandById(apiKey, brandSessionId)
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      brandSession = brand
+      brandId = brand.id
     } else {
       const brand = await getFirstReadyBrand(apiKey)
       if (!brand) {
@@ -77,12 +76,12 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      brandSession = brand
+      brandId = brand.id
     }
 
     const ids = await generateImages(
       apiKey,
-      brandSession.id,
+      brandId,
       prompt,
       aspectRatio,
       variantCount

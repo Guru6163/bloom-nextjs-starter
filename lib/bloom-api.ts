@@ -5,24 +5,20 @@
  * Safe to import from client components and hooks.
  */
 
-import type { AspectRatio, Brand } from "@/lib/bloom"
+import {
+  ASPECT_RATIOS,
+  type AspectRatio,
+  type BrandListItem,
+  type BrandStatus,
+} from "@/lib/bloom-types"
 
 export type { AspectRatio }
+export { ASPECT_RATIOS }
 
-export const ASPECT_RATIOS = [
-  "1:1",
-  "2:3",
-  "3:2",
-  "3:4",
-  "4:3",
-  "4:5",
-  "5:4",
-  "9:16",
-  "16:9",
-  "21:9",
-] as const satisfies readonly AspectRatio[]
-
-export type BrandSummary = Pick<Brand, "id" | "name" | "url" | "status">
+export type BrandSummary = Pick<
+  BrandListItem,
+  "id" | "name" | "url" | "status"
+>
 
 export interface ApiErrorResponse {
   error: string
@@ -64,7 +60,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-const BRAND_STATUSES = new Set<BrandSummary["status"]>([
+const BRAND_STATUSES = new Set<BrandStatus>([
   "analyzing",
   "ready",
   "logo_required",
@@ -168,7 +164,7 @@ export function parseBrandsResponse(payload: unknown): BrandsResponse | null {
       typeof item.name !== "string" ||
       typeof item.url !== "string" ||
       typeof item.status !== "string" ||
-      !BRAND_STATUSES.has(item.status as BrandSummary["status"])
+      !BRAND_STATUSES.has(item.status as BrandStatus)
     ) {
       return null
     }
@@ -176,14 +172,14 @@ export function parseBrandsResponse(payload: unknown): BrandsResponse | null {
       id: item.id,
       name: item.name,
       url: item.url,
-      status: item.status as BrandSummary["status"],
+      status: item.status as BrandStatus,
     })
   }
 
   return { brands }
 }
 
-export function toBrandSummary(brand: Brand): BrandSummary {
+export function toBrandSummary(brand: BrandListItem): BrandSummary {
   return {
     id: brand.id,
     name: brand.name,
