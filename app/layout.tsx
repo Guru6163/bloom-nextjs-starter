@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     "Generate on-brand images in your Next.js app with the Bloom API.",
   icons: {
     icon: "/favicon.ico",
-    apple: "/apple-icon.png",
+    apple: "/bloom-icon-512.png",
   },
 }
 
